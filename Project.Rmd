@@ -1,0 +1,118 @@
+```{r}
+# Data Setup - Converting to Time Series
+library(fpp2)
+library(forecast)
+
+TOTALNSA <- read.csv("TOTALNSA.csv")
+
+TOTALNSA$observation_date <- as.Date(
+  TOTALNSA$observation_date,
+  format = "%m/%d/%Y")
+
+TOTALNSA_ts <- ts(
+  TOTALNSA$TOTALNSA,
+  start = c(1976, 1),
+  frequency = 12)
+
+plot(TOTALNSA_ts)
+
+mean_forecast <- meanf(TOTALNSA_ts,12)
+naive_forecast <- naive(TOTALNSA_ts,12)
+rwf_forecast <- rwf(TOTALNSA_ts,12, drift = TRUE)
+snaive_forecast <- snaive(TOTALNSA_ts,12)
+ets_forecast <- forecast(ets(TOTALNSA_ts),12)
+HW_forecast <- forecast(HoltWinters(TOTALNSA_ts),12)
+
+auto_fit <- auto.arima(
+  TOTALNSA_ts,
+  trace = TRUE,
+  stepwise = FALSE)
+
+ARIMA_forecast <- forecast(
+  auto_fit,
+  h = 5,
+  level = c(95))
+
+plot(HW_forecast,
+     main = "Holt-Winters Forecast",
+     xlab = "Year",
+     ylab = "TOTALNSA",
+     xlim = c(2000, 2027))
+
+plot(TOTALNSA_ts,
+     main = "TOTALNSA Forecast Comparison",
+     xlab = "Year",
+     ylab = "TOTALNSA",
+     xlim = c(2000, 2027))
+lines(mean_forecast$mean, col="pink",lwd = 2)
+lines(naive_forecast$mean, col="blue",lwd = 2)
+lines(rwf_forecast$mean, col="green",lwd = 2)
+lines(snaive_forecast$mean, col="orange",lwd = 2)
+lines(ets_forecast$mean, col="purple", lwd = 2)
+lines(HW_forecast$mean, col="darkgreen", lwd = 2)
+lines(ARIMA_forecast$mean, col="red", lwd = 2)
+
+# Legend
+legend("bottomleft",
+       legend = c("Mean",
+                  "Naive",
+                  "Random Walk with Drift",
+                  "Seasonal Naive",
+                  "ETS",
+                  "Holt-Winters",
+                  "ARIMA"),
+       col = c("pink", "blue", "green",
+               "orange", "purple",
+               "darkgreen", "red"),
+       lty = 1,
+       lwd = 2,
+       cex = 0.6,
+       bty = "n")
+
+
+# MAE Comparison - Actual Assignment Results
+MAE_comparison <- data.frame(
+  Model = c(
+    "Mean",
+    "Naive",
+    "Random Walk",
+    "Seasonal Naive",
+    "ETS",
+    "Holt-Winters",
+    "ARIMA"),
+  MAE = c(
+    1.2767900,
+    0.4214444,
+    0.4074639,
+    0.7665556,
+    0.4505718,
+    0.4066513,
+    0.4150615))
+
+# Highlight model with lowest MAE
+bar_colors <- rep("steelblue", 7)
+bar_colors[which.min(MAE_comparison$MAE)] <- "darkgreen"
+
+# Create Bar Chart
+bars <- barplot(
+  MAE_comparison$MAE,
+  names.arg = MAE_comparison$Model,
+  main = "MAE Comparison Across Forecasting Models",
+  ylab = "Mean Absolute Error (MAE)",
+  col = bar_colors,
+  las = 2,
+  cex.names = 0.6,
+  ylim = c(0, max(MAE_comparison$MAE) * 1.2))
+
+# Display actual MAE above each bar
+text(
+  x = bars,
+  y = MAE_comparison$MAE,
+  labels = sprintf("%.4f", MAE_comparison$MAE),
+  pos = 3,
+  cex = 0.85,
+  col = "black")
+
+# Print MAE comparison
+print(MAE_comparison)
+```

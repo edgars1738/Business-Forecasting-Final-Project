@@ -1,0 +1,110 @@
+---
+title: "Assignment 7"
+author: "Edgar Santiago"
+date: "11/12/2026"
+output: html_document
+---
+  
+```{r}
+# Data Setup - Converting to Time Series
+library(fpp2)
+library(forecast)
+
+TOTALNSA <- read.csv("TOTALNSA.csv")
+
+TOTALNSA$observation_date <- as.Date(
+  TOTALNSA$observation_date,
+  format = "%m/%d/%Y")
+
+TOTALNSA_ts <- ts(
+  TOTALNSA$TOTALNSA,
+  start = c(1976, 1),
+  frequency = 12)
+
+plot(TOTALNSA_ts)
+
+##The U.S. total vehicle sales data from January 1976 to September 2026 shows considerable fluctuations over time, with an average of approximately 15.22 million vehicles at an annualized rate. Sales reached a high of 22.06 million in October 2001 and dropped to 8.92 million in April 2020, representing a decline of approximately 59.6% between those two observations. This indicates that vehicle sales are highly sensitive to major economic disruptions. The data also shows that vehicle sales recovered to 16.38 million by September 2026, approximately 83.6% higher than the April 2020 low.
+
+#Differencing
+ndiffs(TOTALNSA_ts)
+nsdiffs(TOTALNSA_ts)
+tsdisplay(TOTALNSA_ts)
+
+TOTALNSA_diff <- diff(TOTALNSA_ts,differences=1)
+plot(TOTALNSA_diff)
+tsdisplay(TOTALNSA_diff)
+
+##The differencing results show that ndiffs() returned 1, while nsdiffs() returned 0, indicating that the data requires one regular difference but no seasonal differencing. The original time series showed strong autocorrelation of approximately 0.899, suggesting that vehicle sales are heavily influenced by previous months. After first-order differencing, the lag-1 autocorrelation decreased to approximately −0.247. This suggests that differencing successfully reduced the persistence in the data and helped stabilize the series, making it more appropriate for ARIMA forecasting.
+
+#ARIMA Model
+auto_fit <- auto.arima(
+  TOTALNSA_ts,
+  trace = TRUE,
+  stepwise = FALSE)
+
+auto_fit
+attributes(auto_fit)
+
+plot(forecast(auto_fit,h=5,level=c(99.5)))
+
+##The automatic ARIMA selection identified ARIMA(0,1,2)(0,0,2)[12] as the best-fitting model, with an AIC of 1620.38, AICc of 1620.48, and BIC of 1642.43. The model uses one regular difference, two nonseasonal moving-average terms, and two seasonal moving-average terms. The nonseasonal MA coefficients were −0.3466 and −0.2068, indicating that recent forecast errors play an important role in explaining changes in vehicle sales. The seasonal MA coefficients were relatively small at 0.0516 and −0.0682, suggesting weaker seasonal error effects. Overall, the selected model indicates that short-term fluctuations are more influential than seasonal effects in forecasting vehicle sales.
+
+#Residual Analysis
+Acf(auto_fit$residuals)
+
+##The residual analysis suggests that the ARIMA model captures most of the predictable patterns in vehicle sales. The lag-1 residual autocorrelation was approximately extremely close to zero. This indicates that very little immediate autocorrelation remains after fitting the model. Although some large residuals may occur during periods of sudden economic disruption, the low residual autocorrelation suggests that the model has effectively accounted for the historical dependence in the data.
+
+#Ljung-Box Test
+Box.test(
+  residuals(auto_fit),
+  lag = 20,
+  type = "Ljung")
+
+plot.ts(residuals(auto_fit))
+hist(auto_fit$residuals)
+tsdiag(auto_fit)
+
+##The Ljung-Box test produced a test statistic of 13.836 and a p-value of 0.8387, which is substantially greater than the 0.05 significance level. Therefore, we fail to reject the null hypothesis that the residuals are independently distributed across the tested lags. This indicates that there is no statistically significant evidence of remaining autocorrelation across the 20 lags examined. The result supports the conclusion that the ARIMA model has captured the main autocorrelation patterns in vehicle sales and is suitable for forecasting.
+
+#Performing Plot Forecast for the next 5 periods
+ARIMA_forecast <- forecast(
+  auto_fit,
+  h = 5,
+  level = c(95))
+
+ARIMA_forecast
+
+plot(ARIMA_forecast,
+  main = "ARIMA Forecast - U.S. Total Vehicle Sales",
+  xlab = "Year",
+  ylab = "Vehicle Sales")
+
+##The ARIMA model predicts that U.S. vehicle sales will remain relatively stable over the next five months, with a slight increase from 16.40 million in October 2026 to 16.52 million in February 2027.The forecast shows an increase of only approximately 0.7% between October 2026 and February 2027, suggesting that the model does not anticipate significant growth or decline in vehicle sales. However, the 95% prediction interval widens considerably, with February 2027 ranging from 13.97 million to 19.06 million. This indicates that while the model predicts stable sales, uncertainty increases further into the future.
+
+#ARIMA Model Accuracy
+train <- window(TOTALNSA_ts,
+                end = c(2025, 12))
+
+test <- window(TOTALNSA_ts,
+               start = c(2026, 1))
+
+arima_test <- auto.arima(
+  train,
+  stepwise = FALSE)
+
+arima_forecast <- forecast(
+  arima_test,
+  h = length(test))
+
+#Accuracy Test
+accuracy(arima_forecast, test)
+
+#MAE
+accuracy(arima_forecast, test)["Test set", "MAE"]
+
+# Plot Forecast vs Actual
+plot(arima_forecast)
+lines(test, col = "red", lwd = 2)
+
+##The ARIMA model produced an RMSE of 0.5344, MAE of 0.4150, and MAPE of 2.54% on the testing set. The MAE indicates that the model's forecasts differed from actual vehicle sales by approximately 415,000 vehicles on average. The higher RMSE of approximately 534,400 suggests that some periods experienced larger forecasting errors, potentially due to sudden changes in vehicle demand. The MAPE of 2.54% indicates that forecasts differed from actual sales by approximately 2.54% on average, suggesting relatively strong forecasting accuracy. Additionally, the mean error of 0.0536 million vehicles indicates a small overall bias, with the model slightly underestimating actual sales on average. Overall, these results suggest that the ARIMA model provides reasonably accurate forecasts of vehicle sales, although its performance should be compared against other forecasting models to determine the best model.
+```
